@@ -1,0 +1,55 @@
+name: SAM Deploy
+
+on:
+  push:
+    branches:
+      - main 
+
+jobs:
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # Instalar Python 3.9
+    - name: Setup Python 3.9
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+
+    # Instalar dependências
+    - name: Install dependencies
+      run: |
+        python --version
+        pip install --upgrade pip
+        pip install -r src/requirements.txt
+
+    # Instalar SAM CLI
+    - name: Install AWS SAM CLI
+      run: |
+        pip install aws-sam-cli
+  
+    - name: Set up AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Build SAM application
+      run: sam build
+
+    - name: Deploy SAM application
+      env:
+          SQS_ARN: ${{ secrets.SQS_ARN }}
+      run: |
+          sam deploy \
+            --stack-name selectgearmotors-notifications-api-stack \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides \
+                SQSArn=$SQS_ARN \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset

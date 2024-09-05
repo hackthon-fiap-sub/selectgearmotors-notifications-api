@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  SQSArn:
+    Type: String
+    Description: "The ARN of the SQS Queue to receive messages"
+    
+Resources:
+  NotificationGeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.9
+      CodeUri: src/
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt NotificationGeneratorFunctionRole.Arn
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Properties:
+            Queue: !Ref SQSArn
+      Environment:
+        Variables:
+          # Se houver variáveis de ambiente adicionais, coloque-as aqui
+          ENV_VARIABLE: "value"
+
+  # Log Group para a função Lambda no CloudWatch
+  NotificationGeneratorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/NotificationGeneratorFunction
+      RetentionInDays: 7
+
+  # Role IAM para a função Lambda
+  NotificationGeneratorFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaSQSPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !Ref SQSArn
+        - PolicyName: LambdaCloudWatchLogsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+        - PolicyName: LambdaSNSPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: "*"
+
+Outputs:
+  NotificationGeneratorFunctionArn:
+    Description: "ARN of the Lambda function"
+    Value: !GetAtt NotificationGeneratorFunction.Arn
